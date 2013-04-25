@@ -40,6 +40,7 @@ class TankGitDescriptor(AppDescriptor):
         self._path = location_dict.get("path")
         self._version = location_dict.get("version")
         self._branch = location_dict.get("branch", "master")
+        self._needs_update = location_dict.get("needs_update", False)
 
         if self._path is None or self._version is None:
             raise TankError("Git descriptor is not valid: %s" % str(location_dict))
@@ -71,6 +72,8 @@ class TankGitDescriptor(AppDescriptor):
         """
         Returns true if this item exists in a local repo
         """
+        if self._needs_update:
+            return False
         return os.path.exists(self.get_path())
 
     def download_local(self):
@@ -79,9 +82,16 @@ class TankGitDescriptor(AppDescriptor):
         Will exit early if app already exists local.
         """
         if self.exists_local():
+            return
+        elif self._needs_update:
             # if using "live mode" perform a git pull for latest.
-            if self._version == LATEST:
-                self._pull_latest()
+            #
+            # Make sure version is set to latest
+            orig_version = self._version
+            self._version = "latest"
+            self._pull_latest()
+            self._needs_update = False
+            self._version = orig_version
             return
 
         target = self.get_path()
@@ -94,11 +104,11 @@ class TankGitDescriptor(AppDescriptor):
         if self._version == LATEST:
             try:
                 os.chdir(os.path.dirname(target))
-                if os.system('git clone "%s" %s'%(self._path, os.path.basename(target))) != 0:
+                if os.system('git clone -q "%s" %s'%(self._path, os.path.basename(target))) != 0:
                     raise TankError("Could not clone git repository '%s'!" % self._path)
                 if self._branch != "master":
                     os.chdir(target)
-                    if os.system('git checkout %s'%(self._branch)) != 0:
+                    if os.system('git checkout -q %s'%(self._branch)) != 0:
                         raise TankError("Could not checkout git branch '%s'!" % self._branch)
             finally:
                 os.chdir(cwd)
@@ -134,14 +144,24 @@ class TankGitDescriptor(AppDescriptor):
         """
         Pulls the latest changes from remote.
 
-        Probably needs a more robust check for local changes before performing
-        the pull.  As it is, it's very naive.
+        If local modifications exist the pull will abort.
         """
         cwd = os.getcwd()
         try:
             os.chdir(self.get_path())
-            if os.system("git pull") != 0:
+            # First check for any locally modified files before trying to update.
+            #
+            modified_files = subprocess_check_output("git diff --name-only", shell=True).strip().split("\n")
+            if len(modified_files):
+                raise TankError("Could not update git repository do to local modifications '%s'!" % self._path)
+
+            if os.system("git pull -q --rebase") != 0:
                 raise TankError("Could not update git repository '%s'!" % self._path)
+
+            # Need to check if everything went smoothly or needs to be merged.  If it needs to be merged
+            # we should probably abort and have the user update manually...We could also offer to run
+            # the merge right then in the command shell?
+            #
         finally:
             os.chdir(cwd)
 
@@ -149,6 +169,7 @@ class TankGitDescriptor(AppDescriptor):
         """
         Returns a descriptor object that represents the latest version
         """
+
         # now first clone the repo into a tmp location
         clone_tmp = os.path.join(tempfile.gettempdir(), "%s_tank_clone" % uuid.uuid4().hex)
         old_umask = os.umask(0)
@@ -164,23 +185,48 @@ class TankGitDescriptor(AppDescriptor):
 
             os.chdir(clone_tmp)
 
-            try:
-                git_hash = subprocess_check_output("git rev-list --tags --max-count=1", shell=True).strip()
-            except Exception, e:
-                raise TankError("Could not get list of tags for %s: %s" % (self._path, e))
+            needs_update = False
+            latest_version = self._version
 
-            try:
-                latest_version = subprocess_check_output("git describe --tags %s" % git_hash, shell=True).strip()
-            except Exception, e:
-                raise TankError("Could not get tag for hash %s: %s" % (hash, e))
+            if self._version == LATEST:
+                # If version is set to latest we are using a live git clone.
+                # Check the new clone latest revision for the branch vs the
+                # current revision.
+                #
+                try:
+                    if os.system("git checkout -q %s"%self._branch) != 0:
+                        raise TankError("Could not checkout branch %s" % (self._branch))
+                    git_hash = subprocess_check_output("git rev-list --max-count=1 %s" % self._branch, shell=True).strip()
+                except Exception, e:
+                    raise TankError("Could not get list of tags for %s: %s" % (self._path, e))
+
+                try:
+                    current_git_hash = subprocess_check_output("git rev-list --max-count=1 %s" % self._branch, shell=True).strip()
+                except:
+                    raise TankError("Could not get current hash for %s: %s" % (self._path, e))
+
+                if current_git_hash != git_hash:
+                    latest_version = git_hash[:7]
+                    needs_update = True
+            else:
+                try:
+                    git_hash = subprocess_check_output("git rev-list --tags --max-count=1", shell=True).strip()
+                except Exception, e:
+                    raise TankError("Could not get list of tags for %s: %s" % (self._path, e))
+
+                try:
+                    latest_version = subprocess_check_output("git describe --tags %s" % git_hash, shell=True).strip()
+                except Exception, e:
+                    raise TankError("Could not get tag for hash %s: %s" % (hash, e))
 
         finally:
             os.chdir(cwd)
 
-
         new_loc_dict = copy.deepcopy(self._location_dict)
         new_loc_dict["version"] = latest_version
 
-        return TankGitDescriptor(self._project_root, new_loc_dict, self._type)
+        # Used in the case of a "live" git repo.
+        #
+        new_loc_dict["needs_update"] = needs_update
 
-
+        return TankGitDescriptor(self._pipeline_config, new_loc_dict, self._type)
