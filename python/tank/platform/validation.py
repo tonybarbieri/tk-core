@@ -15,7 +15,7 @@ from ..template import TemplateString
 def validate_schema(app_or_engine_display_name, schema):
     """
     Validates the schema definition (info.yml) of an app or engine.
-    
+
     Will raise a TankError if validation fails, will return None
     if validation suceeds.
     """
@@ -26,14 +26,14 @@ def validate_settings(app_or_engine_display_name, tank_api, context, schema, set
     """
     Validates the settings of an app or engine against its
     schema definition (info.yml).
-    
+
     Will raise a TankError if validation fails, will return None
     if validation succeeds.
     """
     v = _SettingsValidator(app_or_engine_display_name, tank_api, schema, context)
     v.validate(settings)
-    
-    
+
+
 def validate_context(descriptor, context):
     """
     Validates a bundle to check that the given context
@@ -52,41 +52,41 @@ def validate_context(descriptor, context):
         raise TankError("The item requires the following "
                         "items in the context: %s. The current context is missing one "
                         "or more of these items: %s" % (req_ctx, context) )
-    
+
 def validate_platform(descriptor):
     """
-    Validates that the given bundle is compatible with the 
+    Validates that the given bundle is compatible with the
     current operating system
     """
     # make sure the current operating system platform is supported
     supported_platforms = descriptor.get_supported_platforms()
     if len(supported_platforms) > 0:
         # supported platforms defined in manifest
-        # get a human friendly mapping of current platform: linux/mac/windows 
+        # get a human friendly mapping of current platform: linux/mac/windows
         nice_system_name = {"linux2": "linux", "darwin": "mac", "win32": "windows"}[sys.platform]
         if nice_system_name not in supported_platforms:
             raise TankError("The current operating system '%s' is not supported."
                             "Supported platforms are: %s" % (nice_system_name, supported_platforms))
 
-    
+
 def get_missing_frameworks(descriptor, environment):
     """
-    Returns a list of framework descriptors by the given descriptor required but not present 
+    Returns a list of framework descriptors by the given descriptor required but not present
     in the given environment.
-    
+
     returns items on the following form:
     [{'version': 'v0.1.0', 'name': 'tk-framework-widget'}]
-    
+
     :returns: list dictionaries, each with a name and a version key.
     """
     required_frameworks = descriptor.get_required_frameworks()
-    
+
     if len(required_frameworks) == 0:
         return []
 
     # get all framework descriptors defined in the environment
-    # put a tuple with (name, version) into a list 
-    fws_in_env = [] 
+    # put a tuple with (name, version) into a list
+    fws_in_env = []
     for fw_instance_str in environment.get_frameworks():
         descriptor = environment.get_framework_descriptor(fw_instance_str)
         d_identifier = (descriptor.get_system_name(), descriptor.get_version())
@@ -102,19 +102,19 @@ def get_missing_frameworks(descriptor, environment):
 
     return missing_fws
 
-    
-    
+
+
 def validate_and_return_frameworks(descriptor, environment):
     """
     Validates the frameworks needed for an given descriptor.
-    
+
     Returns a list of the instance names for each of the frameworks needed by the input descriptor.
-    
-    Will raise exceptions if there are frameworks missing from the environment. 
+
+    Will raise exceptions if there are frameworks missing from the environment.
     """
-    
+
     required_frameworks = descriptor.get_required_frameworks()
-    
+
     if len(required_frameworks) == 0:
         return []
 
@@ -124,7 +124,7 @@ def validate_and_return_frameworks(descriptor, environment):
     fw_descriptors = {}
     for x in environment.get_frameworks():
         fw_descriptors[x] = environment.get_framework_descriptor(x)
-    
+
     # check that each framework required by this app is defined in the environment
     required_fw_instance_names = []
     for fw in required_frameworks:
@@ -147,29 +147,29 @@ def validate_and_return_frameworks(descriptor, environment):
                 msg += "The currently installed frameworks are: \n"
                 fw_strings = []
                 for x in fw_descriptors:
-                    fw_strings.append("Name: '%s', Version: '%s'" % (fw_descriptors[x].get_system_name(), 
+                    fw_strings.append("Name: '%s', Version: '%s'" % (fw_descriptors[x].get_system_name(),
                                                                      fw_descriptors[x].get_version()))
                 msg += "\n".join(fw_strings)
-                
-            raise TankError(msg) 
-        
+
+            raise TankError(msg)
+
     return required_fw_instance_names
-        
+
 
 def validate_single_setting(app_or_engine_display_name, tank_api, schema, setting_name, setting_value):
     """
-    Validates a single setting for an app or engine against its 
+    Validates a single setting for an app or engine against its
     schema definition (info.yml).
-    
+
     Will raise a TankError if validation fails, will return None if validation succeeds.
-    
-    Note that this method does not require a context to be present in order to 
-    perform the validation, however it will not be able to fully validate some 
+
+    Note that this method does not require a context to be present in order to
+    perform the validation, however it will not be able to fully validate some
     template types, since a full validaton would require a context.
     """
     v = _SettingsValidator(app_or_engine_display_name, tank_api, schema)
     v.validate_setting(setting_name, setting_value)
-    
+
 def convert_string_to_type(string_value, schema_type):
     """
     Attempts to convert a string value into a schema type.
@@ -177,13 +177,13 @@ def convert_string_to_type(string_value, schema_type):
     and is therefore not safe!
     """
     # assume that the value is a string unless otherwise stated.
-    
+
     if schema_type == "float":
         evaluated_value = float(string_value)
-    
+
     elif schema_type == "int":
         evaluated_value = int(string_value)
-    
+
     elif schema_type == "bool":
         if string_value == "False":
             evaluated_value = False
@@ -191,19 +191,19 @@ def convert_string_to_type(string_value, schema_type):
             evaluated_value = True
         else:
             raise TankError("Invalid boolean value %s! Valid values are True and False" % string_value)
-    
+
     elif schema_type == "list":
         evaluated_value = eval(string_value)
-        
+
     elif schema_type == "dict":
         evaluated_value = eval(string_value)
 
     else:
         # assume string-like
         evaluated_value = string_value
-        
+
     return evaluated_value
-    
+
 # Helper used by both schema and settings validators
 def _validate_expected_data_type(expected_type, value):
     value_type_name = type(value).__name__
@@ -215,18 +215,18 @@ def _validate_expected_data_type(expected_type, value):
         expected_type_name = expected_type
 
     return expected_type_name == value_type_name
-        
+
 class _SchemaValidator:
 
     def __init__(self, display_name, schema):
         self._display_name = display_name
         self._schema = schema
-    
+
     def validate(self):
         for settings_key in self._schema:
             value_schema = self._schema.get(settings_key, {})
             self.__validate_schema_value(settings_key, value_schema)
-            
+
     def __validate_schema_type(self, settings_key, data_type):
         if not data_type:
             raise TankError("Missing type in schema '%s' for '%s'!" % (settings_key, self._display_name))
@@ -240,8 +240,8 @@ class _SchemaValidator:
         self.__validate_schema_type(settings_key, data_type)
 
         if "default_value" in schema and not _validate_expected_data_type(data_type, schema["default_value"]):
-            params = (settings_key, 
-                      self._display_name, 
+            params = (settings_key,
+                      self._display_name,
                       type(schema["default_value"]).__name__, data_type)
             err_msg = "Invalid type for default value in schema '%s' for '%s' - found '%s', expected '%s'" % params
             raise TankError(err_msg)
@@ -281,13 +281,13 @@ class _SchemaValidator:
             self.__validate_schema_value(settings_key, value_schema)
 
     def __validate_schema_template(self, settings_key, schema):
-        
+
         # new style template def: if there is a fields key, it should be a str
         if "fields" in schema and type(schema["required_fields"]) != str:
             params = (settings_key, self._display_name)
             raise TankError("Invalid 'fields' string in schema '%s' for '%s'!" % params)
-        
-        
+
+
         # If there's a required_fields key, it should contain a list of strs.
         if "required_fields" in schema and type(schema["required_fields"]) != list:
             params = (settings_key, self._display_name)
@@ -320,31 +320,31 @@ class _SettingsValidator:
         self._tank_api = tank_api
         self._context = context
         self._schema = schema
-        
+
     def validate(self, settings):
         # first sanity check that the schema is correct
         validate_schema(self._display_name, self._schema)
-        
+
         # Ensure that all required keys are in the settings and that the
         # values are appropriate.
         for settings_key in self._schema:
             value_schema = self._schema.get(settings_key, {})
-            
+
             # make sure the required key exists in the environment settings
             if settings_key not in settings:
                 raise TankError("Missing required key '%s' in settings!" % settings_key)
-            
+
             self.__validate_settings_value(settings_key, value_schema, settings[settings_key])
-    
+
     def validate_setting(self, setting_name, setting_value):
         # first sanity check that the schema is correct
         validate_schema(self._display_name, self._schema)
-        
+
         # make sure the required key exists in the settings
         value_schema = self._schema.get(setting_name, {})
         self.__validate_settings_value(setting_name, value_schema, setting_value)
-        
-        
+
+
     def __validate_settings_value(self, settings_key, schema, value):
         data_type = schema.get("type")
 
@@ -400,7 +400,7 @@ class _SettingsValidator:
 
     def __validate_settings_dict(self, settings_key, schema, value):
         items = schema.get("items", {})
-        for (key, value_schema) in items.items():            
+        for (key, value_schema) in items.items():
             # Check for required keys
             if not key in value:
                 params = (key, settings_key, self._display_name)
@@ -410,9 +410,9 @@ class _SettingsValidator:
             self.__validate_settings_value(settings_key, value_schema, value[key])
 
     def __validate_settings_template(self, settings_key, schema, template_name):
-        
+
         # look it up in the master file
-        cur_template = self._tank_api.templates.get(template_name) 
+        cur_template = self._tank_api.templates.get(template_name)
         if cur_template is None:
             # this was not found in the master config!
             raise TankError("The Tank Template '%s' referred to by the setting '%s' does "
@@ -420,64 +420,64 @@ class _SettingsValidator:
 
 
         if "fields" in schema:
-            
+
             #################################################################################
             # NEW SCHOOL VALIDATION USING fields: context, foo, bar, [baz]
             #
-            
+
             problems = self.__validate_new_style_template(cur_template, str(schema.get("fields")) )
-            
+
             if len(problems) > 0:
                 msg = ("%s: The Tank Template '%s' referred to by the setting '%s' "
                        "does not validate. The following problems were "
                        "reported: " % (self._display_name, template_name, settings_key))
                 for p in problems:
                     msg += "%s " % p
-                
+
                 raise TankError(msg)
 
-        
+
         else:
-            
+
             #################################################################################
             # OLD SCHOOL VALIDATION USING required_fields, optional_fields etc.
-    
+
             if isinstance(cur_template, TemplateString):
                 # Don't validate template strings
                 return
-    
-            # Check fields 
+
+            # Check fields
             required_fields = set(schema.get("required_fields", []))
             # All template fields
             template_fields = set(cur_template.keys)
             # Template field without default values
             no_default_fields = set(cur_template.missing_keys({}, skip_defaults=True))
             optional_fields = schema.get("optional_fields", [])
-    
+
             # check required fields exist in template
             missing_fields = required_fields - template_fields
             if missing_fields:
                 raise TankError("The Tank Template '%s' referred to by the setting '%s' does "
                                 "not contain required fields '%s'!" % (template_name, settings_key, list(missing_fields)))
-    
-    
-            # If optional_fields is "*" then we're done. If optional_fields is a list, then validate 
+
+
+            # If optional_fields is "*" then we're done. If optional_fields is a list, then validate
             # that all keys in the template are satisfied by a required, optional or context field.
-            
+
             # note - only perform this context based valiation if context is not None.
-            # this means that it is possible to run a partial (yet extensive) validation 
+            # this means that it is possible to run a partial (yet extensive) validation
             # without having access to the context.
             #
             # NOTE!!!!! This special validate_context flag checked below is something that is
             # only used by the unit tests...
             #
-            if self._context:        
+            if self._context:
                 if optional_fields != "*" and schema.get("validate_context", True):
                     optional_fields = set(optional_fields)
-                    
-                    # collect all fields that will be covered by the context object. 
+
+                    # collect all fields that will be covered by the context object.
                     context_fields = set( self._context.as_template_fields(cur_template).keys() )
-                    
+
                     # check template fields (keys) not in required are available through context
                     missing_fields = ((no_default_fields - required_fields) - optional_fields) - context_fields
                     if missing_fields:
@@ -494,44 +494,40 @@ class _SettingsValidator:
         # if setting is default, assume everything is fine
         if hook_name == constants.TANK_BUNDLE_DEFAULT_HOOK_SETTING:
             return
-        
-        hooks_folder = self._tank_api.pipeline_configuration.get_hooks_location()
-        hook_path = os.path.join(hooks_folder, "%s.py" % hook_name)
 
-        if not os.path.exists(hook_path):
+        found_hook = self._tank_api.pipeline_configuration.find_bundle_hook_location(hook_name)
+        if not found_hook:
             msg = ("Invalid configuration setting '%s' for %s: "
-                   "The specified hook file '%s' does not exist." % (settings_key, 
+                   "The specified hook file '%s' does not exist." % (settings_key,
                                                                      self._display_name,
-                                                                     hook_path) ) 
+                                                                     hook_path) )
             raise TankError(msg)
-            
+
 
     def __validate_settings_config_path(self, settings_key, schema, config_value):
         """
-        Validate that the value for a setting of type config_path corresponds to a file in the 
+        Validate that the value for a setting of type config_path corresponds to a file in the
         config folder somewhere
-        """        
+        """
         if config_value.startswith("/"):
             msg = ("Invalid configuration setting '%s' for %s: "
-                   "Config value '%s' starts with a / which is not valid." % (settings_key, 
+                   "Config value '%s' starts with a / which is not valid." % (settings_key,
                                                                               self._display_name,
-                                                                              config_value) ) 
+                                                                              config_value) )
             raise TankError(msg)
-        
-        config_folder = self._tank_api.pipeline_configuration.get_config_location()
-        adjusted_value = config_value.replace("/", os.path.sep)
-        full_path = os.path.join(config_folder, adjusted_value)
 
-        if not os.path.exists(full_path):
+        found_config_path = self._tank_api.pipeline_configuration.find_config_location(config_value)
+
+        if not found_config_path:
             msg = ("Invalid configuration setting '%s' for %s: "
-                   "The specified resource '%s' does not exist." % (settings_key, 
+                   "The specified resource '%s' does not exist." % (settings_key,
                                                                     self._display_name,
-                                                                    full_path) ) 
+                                                                    full_path) )
             raise TankError(msg)
 
-            
+
     def __validate_new_style_template(self, cur_template, fields_str):
-        
+
         #################################################################################
         # NEW SCHOOL VALIDATION USING fields: context, foo, bar, [baz]
         #
@@ -546,12 +542,12 @@ class _SettingsValidator:
         # context, name, version, [width], [height]
         # name, *
         # context, *
-        
+
         # get all values in a list
         field_chunks = fields_str.split(",")
         # chop whitespace
         field_chunks = [ x.strip() for x in field_chunks ]
-        
+
         # process
         mandatory = set()
         optional = set()
@@ -566,77 +562,77 @@ class _SettingsValidator:
                 optional.add( x[1:-1] )
             else:
                 mandatory.add(x)
-        
+
         # validate
         # get all fields which do not have default values
         fields_needing_values = set(cur_template.missing_keys({}, skip_defaults=True))
         problems = []
-        
+
         # pass 1: ensure all mandatory fields are present.
         for m in mandatory:
             if m not in fields_needing_values:
                 problems.append("The mandatory field '%s' is missing" % m)
-        
+
         if star == True:
             # means an open ended number of fields can be used.
             # no need to do more validation
             pass
-        
+
         elif self._context is None:
             # we don't have the context (we are outside app rumtime mode)
             # and cannot do any further validation
             pass
-        
+
         elif len(problems) > 0:
             # one or more mandatory issues. No point checking further
             pass
-        
+
         else:
             # there are a fixed number of fields that we need to populate
             # make sure we have populated exactly those fields
-                        
+
             remaining_fields = fields_needing_values - mandatory
-                        
+
             if include_context:
                 # gather all the fields that will be covered by the context object
                 context_fields = set( self._context.as_template_fields(cur_template).keys() )
                 remaining_fields = remaining_fields - context_fields
-                
+
                 for x in remaining_fields:
                     if x not in optional:
-                        # we have a field that is in the template but which is not 
+                        # we have a field that is in the template but which is not
                         # covered, either in the context nor in the schema fields
-                        
+
                         required_and_optional_str = ", ".join(mandatory+optional)
                         context_fields_str = ", ".join(context_fields)
-                        
+
                         problems.append("The field '%s' is part of the template but %s does not "
                                         "know how to assign a value to it when calculating paths. "
                                         "The code inside %s will populate the following fields: %s. "
                                         "Tank's current context (%s) will populate the following fields: "
-                                        "%s." % (x, 
-                                                 self._display_name, 
-                                                 self._display_name, 
-                                                 required_and_optional_str, 
+                                        "%s." % (x,
+                                                 self._display_name,
+                                                 self._display_name,
+                                                 required_and_optional_str,
                                                  str(self._context),
                                                  context_fields_str))
-                        
+
             else:
                 # the context is not taken into account.
                 for x in remaining_fields:
                     if x not in optional:
-                        # we have a field that is in the template but which is not 
+                        # we have a field that is in the template but which is not
                         # covered by mandatory or optional
-                        
+
                         required_and_optional_str = ", ".join(mandatory+optional)
-                        
+
                         problems.append("The field '%s' is part of the template but %s does not "
                                         "know how to assign a value to it when calculating paths. "
                                         "The code inside %s will populate the following fields: "
-                                        "%s." % (x, 
-                                                 self._display_name, 
-                                                 self._display_name, 
+                                        "%s." % (x,
+                                                 self._display_name,
+                                                 self._display_name,
                                                  required_and_optional_str))
-                
+
         #####
         return problems
