@@ -33,3 +33,6 @@ coverage.xml
 
 # os files
 .DS_Store
+
+config/*
+!config/*.example

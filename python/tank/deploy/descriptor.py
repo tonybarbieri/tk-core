@@ -1,11 +1,11 @@
 # Copyright (c) 2013 Shotgun Software Inc.
-# 
+#
 # CONFIDENTIAL AND PROPRIETARY
-# 
-# This work is provided "AS IS" and subject to the Shotgun Pipeline Toolkit 
+#
+# This work is provided "AS IS" and subject to the Shotgun Pipeline Toolkit
 # Source Code License included in this distribution package. See LICENSE.
-# By accessing, using, copying or modifying this work you indicate your 
-# agreement to the Shotgun Pipeline Toolkit Source Code License. All rights 
+# By accessing, using, copying or modifying this work you indicate your
+# agreement to the Shotgun Pipeline Toolkit Source Code License. All rights
 # not expressly granted therein are reserved by Shotgun Software Inc.
 
 """
@@ -44,7 +44,7 @@ class AppDescriptor(object):
 
     def __init__(self, pipeline_config, location_dict):
         self._pipeline_config = pipeline_config
-        self._location_dict = location_dict        
+        self._location_dict = location_dict
         self.__manifest_data = None
 
     def __repr__(self):
@@ -111,15 +111,15 @@ class AppDescriptor(object):
             # make sure payload exists locally
             if not self.exists_local():
                 self.download_local()
-                
+
             # get the metadata
             bundle_root = self.get_path()
-        
+
             file_path = os.path.join(bundle_root, constants.BUNDLE_METADATA_FILE)
-        
+
             if not os.path.exists(file_path):
                 raise TankError("Toolkit metadata file '%s' missing." % file_path)
-        
+
             try:
                 file_data = open(file_path)
                 try:
@@ -128,10 +128,10 @@ class AppDescriptor(object):
                     file_data.close()
             except Exception, exp:
                 raise TankError("Cannot load metadata file '%s'. Error: %s" % (file_path, exp))
-        
+
             # cache it
             self.__manifest_data = metadata
-        
+
         # return a copy
         return copy.deepcopy(self.__manifest_data)
 
@@ -163,7 +163,7 @@ class AppDescriptor(object):
         meta = self._get_metadata()
         desc = meta.get("description")
         if desc is None:
-            desc = "No description available." 
+            desc = "No description available."
         return desc
 
     def get_icon_256(self):
@@ -176,9 +176,9 @@ class AppDescriptor(object):
         else:
             # return default
             # Note: local import here to avoid cyclic dependency!
-            from ..pipelineconfig import get_current_code_install_root
-            default_icon = os.path.join(get_current_code_install_root(), "install", "core", 
-                                        "resources", "default_app_icon_256.png")
+            from ..pipelineconfig import get_current_core_root
+            default_icon = os.path.join(get_current_core_root(),  "resources",
+                                        "default_app_icon_256.png")
             return default_icon
 
     def get_support_url(self):
@@ -189,14 +189,14 @@ class AppDescriptor(object):
         meta = self._get_metadata()
         support_url = meta.get("support_url")
         if support_url is None:
-            support_url = "https://toolkit.shotgunsoftware.com" 
+            support_url = "https://toolkit.shotgunsoftware.com"
         return support_url
 
     def get_doc_url(self):
         """
         Returns the documentation url for this item. Returns None if the documentation url
         is not defined. This is sometimes subclassed, where a descriptor (like the tank app
-        store) and support for automatic, built in documentation management. If not, the 
+        store) and support for automatic, built in documentation management. If not, the
         default implementation will search the manifest for a doc url location.
         """
         meta = self._get_metadata()
@@ -214,10 +214,10 @@ class AppDescriptor(object):
         constraints = {}
 
         meta = self._get_metadata()
-        
+
         if meta.get("requires_shotgun_version") is not None:
             constraints["min_sg"] = meta.get("requires_shotgun_version")
-        
+
         if meta.get("requires_core_version") is not None:
             constraints["min_core"] = meta.get("requires_core_version")
 
@@ -230,20 +230,20 @@ class AppDescriptor(object):
         """
         Returns the engines supported for this app. May return None,
         meaning that anything goes.
-        
+
         return: None                   (all engines are fine!)
         return: ["tk-maya", "tk-nuke"] (works with maya and nuke)
         """
         md  = self._get_metadata()
         return md.get("supported_engines")
-        
+
     def get_required_context(self):
         """
         Returns the required context, if there is one defined for a bundle.
-        This is a list of strings, something along the lines of 
-        ["user", "task", "step"] for an app that requires a context with 
+        This is a list of strings, something along the lines of
+        ["user", "task", "step"] for an app that requires a context with
         user task and step defined.
-        
+
         Always returns a list, with an empty list meaning no items required.
         """
         md  = self._get_metadata()
@@ -251,15 +251,15 @@ class AppDescriptor(object):
         if rc is None:
             rc = []
         return rc
-    
+
     def get_supported_platforms(self):
         """
         Returns the platforms supported. Possible values
-        are windows, linux and mac. 
-        
-        Always returns a list, returns an empty list if there is 
-        no constraint in place. 
-        
+        are windows, linux and mac.
+
+        Always returns a list, returns an empty list if there is
+        no constraint in place.
+
         example: ["windows", "linux"]
         example: []
         """
@@ -268,7 +268,7 @@ class AppDescriptor(object):
         if sp is None:
             sp = []
         return sp
-        
+
     def get_configuration_schema(self):
         """
         Returns the manifest configuration schema for this bundle.
@@ -280,14 +280,14 @@ class AppDescriptor(object):
         if cfg is None:
             cfg = {}
         return cfg
-         
+
     def get_required_frameworks(self):
         """
         returns the list of required frameworks for this item.
         Always returns a list for example
-        
+
         [{'version': 'v0.1.0', 'name': 'tk-framework-widget'}]
-        
+
         Each item contains a name and a version key.
         """
         md  = self._get_metadata()
@@ -307,26 +307,26 @@ class AppDescriptor(object):
 
     ###############################################################################################
     # stuff typically implemented by deriving classes
-    
+
     def get_system_name(self):
         """
         Returns a short name, suitable for use in configuration files
         and for folders on disk
         """
         raise NotImplementedError
-    
+
     def get_version(self):
         """
         Returns the version number string for this item.
         """
-        raise NotImplementedError    
-    
+        raise NotImplementedError
+
     def get_path(self):
         """
         returns the path to the folder where this item resides
         """
         raise NotImplementedError
-        
+
     def get_changelog(self):
         """
         Returns information about the changelog for this item.
@@ -334,7 +334,7 @@ class AppDescriptor(object):
         to indicate that no changelog exists.
         """
         return (None, None)
-    
+
     def exists_local(self):
         """
         Returns true if this item exists in a local repo
@@ -350,12 +350,12 @@ class AppDescriptor(object):
     def find_latest_version(self, constraint_pattern=None):
         """
         Returns a descriptor object that represents the latest version.
-        
+
         :param constraint_pattern: If this is specified, the query will be constrained
         by the given pattern. Version patterns are on the following forms:
-        
+
             - v1.2.3 (means the descriptor returned will inevitably be same as self)
-            - v1.2.x 
+            - v1.2.x
             - v1.x.x
 
         :returns: descriptor object
@@ -385,8 +385,8 @@ class AppDescriptor(object):
         sg_fields_def = meta.get("requires_shotgun_fields")
         if sg_fields_def:  # can be defined as None from yml file
             # get a sg handle
-            sg = shotgun.create_sg_connection()
-            
+            sg = shotgun.create_sg_connection(pc=self._pipeline_config)
+
             for sg_entity_type in sg_fields_def:
                 for field in sg_fields_def.get(sg_entity_type, []):
                     # attempt to create field!
@@ -400,14 +400,14 @@ class AppDescriptor(object):
         hooks directory for an app or engine, if a 'post_install.py' hook
         exists, the hook will be executed upon each installation.
         """
-        
+
         post_install_hook_path = os.path.join(self.get_path(), "hooks",
                                               "post_install.py")
-        
-        if os.path.exists(post_install_hook_path):            
-            
+
+        if os.path.exists(post_install_hook_path):
+
             try:
-                hook.execute_hook(post_install_hook_path, 
+                hook.execute_hook(post_install_hook_path,
                                   parent=None,
                                   pipeline_configuration=self._pipeline_config.get_path(),
                                   path=self.get_path())
@@ -415,8 +415,8 @@ class AppDescriptor(object):
             except Exception, e:
                 raise TankError("Could not run post-install hook for %s. "
                                 "Error reported: %s" % (self, e))
-            
-            
+
+
 
 
 ################################################################################################

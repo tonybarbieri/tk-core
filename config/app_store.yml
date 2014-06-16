@@ -1,0 +1,9 @@
+# Tank configuration file
+# this file was automatically created
+
+host: https://tank.shotgunstudio.com
+api_script: psyop
+api_key: f816532a0d23ec5a12c804470d93bd4c984f0d7d
+http_proxy: null
+
+# End of file.

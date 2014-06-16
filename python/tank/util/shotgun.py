@@ -1,11 +1,11 @@
 # Copyright (c) 2013 Shotgun Software Inc.
-# 
+#
 # CONFIDENTIAL AND PROPRIETARY
-# 
-# This work is provided "AS IS" and subject to the Shotgun Pipeline Toolkit 
+#
+# This work is provided "AS IS" and subject to the Shotgun Pipeline Toolkit
 # Source Code License included in this distribution package. See LICENSE.
-# By accessing, using, copying or modifying this work you indicate your 
-# agreement to the Shotgun Pipeline Toolkit Source Code License. All rights 
+# By accessing, using, copying or modifying this work you indicate your
+# agreement to the Shotgun Pipeline Toolkit Source Code License. All rights
 # not expressly granted therein are reserved by Shotgun Software Inc.
 
 """
@@ -28,159 +28,34 @@ from . import login
 
 g_app_store_connection = None
 
-def __get_api_core_config_location():
-    """
-    Given the location of the code, find the core config location.
-
-    Walk from the location of this file on disk to the config area.
-    this operation is guaranteed to work on any valid tank installation
-
-    Pipeline Configuration / Studio Location
-       |
-       |- Install
-       |     \- Core
-       |          \- Python
-       |                \- tank
-       |
-       \- Config
-             \- Core
-    """
-    # local import to avoid cyclic references
-    from ..pipelineconfig import get_current_code_install_root
-    core_api_root = get_current_code_install_root()
-    core_cfg = os.path.join(core_api_root, "config", "core")
-
-    if not os.path.exists(core_cfg):
-        full_path_to_file = os.path.abspath(os.path.dirname(__file__))
-        raise TankError("Cannot resolve the core configuration from the location of the Sgtk Code! "
-                        "This can happen if you try to move or symlink the Sgtk API. The "
-                        "Sgtk API is currently picked up from %s which is an "
-                        "invalid location." % full_path_to_file)
-
-    return core_cfg
-
-def __get_sg_config():
-    """
-    Returns the sg config yml file for this install
-    """
-    core_cfg = __get_api_core_config_location()
-    return os.path.join(core_cfg, "shotgun.yml")
-
-def __get_app_store_config():
-    """
-    Returns the sg config yml file for this install
-    """
-    core_cfg = __get_api_core_config_location()
-    return os.path.join(core_cfg, "app_store.yml")     
-
-
 def get_project_name_studio_hook_location():
     """
     Returns the path to the studio level project naming hook.
     """
-    
+
     # NOTE! This code is located here because it needs to be able to run without a project.
     # the natural place would probably have been to put this inside the pipeline configuration
     # class, however this object assumes a project that exists.
     #
-    # @todo longterm we should probably establish a place in the code where we define 
-    # an API or set of functions which can be executed outside the remit of a 
+    # @todo longterm we should probably establish a place in the code where we define
+    # an API or set of functions which can be executed outside the remit of a
     # pipeline configuration/toolkit project.
-    
-    core_cfg = __get_api_core_config_location()
+    from ..pipelineconfig import get_current_core_hooks_root
+    core_cfg = get_current_core_hooks_root()
     return os.path.join(core_cfg, constants.STUDIO_HOOK_PROJECT_NAME)
 
-def __get_sg_config_data(shotgun_cfg_path, user="default"):
-    """
-    Returns the shotgun configuration yml parameters given a config file.
-    
-    The shotgun.yml may look like:
-
-        host: str
-        api_script: str
-        api_key: str
-        http_proxy: str
-    
-        or may now look like:
-    
-        <User>:
-            host: str
-            api_script: str
-            api_key: str
-            http_proxy: str
-    
-        <User>:
-            host: str
-            api_script: str
-            api_key: str
-            http_proxy: str
-
-    The optional user param refers to the <User> in the shotgun.yml.
-    If a user is not found the old style is attempted.    
-    
-    :param shotgun_cfg_path: path to config file
-    :param user: Optional user to pass when a multi-user config is being read 
-    :returns: dictionary with keys host, api_script, api_key and optionally http_proxy
-    """
-    
-    # read in settings from shotgun.yml
-    if not os.path.exists(shotgun_cfg_path):
-        raise TankError("Could not find shotgun configuration file '%s'!" % shotgun_cfg_path)
-
-    # load the config file
-    try:
-        open_file = open(shotgun_cfg_path)
-        try:
-            file_data = yaml.load(open_file)
-        finally:
-            open_file.close()
-    except Exception, error:
-        raise TankError("Cannot load config file '%s'. Error: %s" % (shotgun_cfg_path, error))
-
-    if user in file_data:
-        # new config format!
-        # we have explicit users defined!
-        config_data = file_data[user]
-    else:
-        # old format - not grouped by user
-        config_data = file_data
-    
-    # now check if there is a studio level override hook which want to refine these settings 
-    sg_hook_path = os.path.join(__get_api_core_config_location(), constants.STUDIO_HOOK_SG_CONNECTION_SETTINGS)
-    
-    if os.path.exists(sg_hook_path):
-        # custom hook is available!
-        config_data = hook.execute_hook(sg_hook_path, 
-                                        parent=None, 
-                                        config_data=config_data, 
-                                        user=user, 
-                                        cfg_path=shotgun_cfg_path)
-        
-    # validate the config data to ensure all fields are present
-    if "host" not in config_data:
-        raise TankError("Missing required field 'host' in config '%s'" % shotgun_cfg_path)
-    if "api_script" not in config_data:
-        raise TankError("Missing required field 'api_script' in config '%s'" % shotgun_cfg_path)
-    if "api_key" not in config_data:
-        raise TankError("Missing required field 'api_key' in config '%s'" % shotgun_cfg_path)
-    
-    return config_data
-
-def __create_sg_connection(shotgun_cfg_path, evaluate_script_user, user="default"):
+def __create_sg_connection(config_data, evaluate_script_user):
     """
     Creates a standard toolkit shotgun connection.
 
     :param shotgun_cfg_path: path to a configuration file to read settings from
-    :param evaluate_script_user: if True, the id of the script user will be 
+    :param evaluate_script_user: if True, the id of the script user will be
                                  looked up and returned.
     :param user: If a multi-user config is used, this is the user to create the connection for.
-    
-    :returns: tuple with (sg_api_instance, script_user_dict) where script_user_dict is None if
-              evaluate_script_user is False else a dictionary with type and id keys. 
-    """
 
-    # get connection parameters
-    config_data = __get_sg_config_data(shotgun_cfg_path, user)
+    :returns: tuple with (sg_api_instance, script_user_dict) where script_user_dict is None if
+              evaluate_script_user is False else a dictionary with type and id keys.
+    """
 
     # create API
     sg = Shotgun(config_data["host"],
@@ -204,13 +79,13 @@ def __create_sg_connection(shotgun_cfg_path, evaluate_script_user, user="default
 
     return (sg, script_user)
 
-    
+
 def download_url(sg, url, location):
     """
     Convenience method that downloads a file from a given url.
     This method will take into account any proxy settings which have
     been defined in the Shotgun connection parameters.
-    
+
     :param sg: sg API to get proxy connection settings from
     :param url: url to download
     :param location: path on disk where the payload should be written.
@@ -220,8 +95,8 @@ def download_url(sg, url, location):
     """
 
     # now build the appropriate urrlib2 opener object.
-    # this code is the same as in the Shotgun API, meaning that 
-    # we can re-use the proxy configuration from the shotgun config 
+    # this code is the same as in the Shotgun API, meaning that
+    # we can re-use the proxy configuration from the shotgun config
     if sg.config.proxy_server:
         # handle proxy auth
         if sg.config.proxy_user and sg.config.proxy_pass:
@@ -232,7 +107,7 @@ def download_url(sg, url, location):
         proxy_support = urllib2.ProxyHandler({"http" : proxy_addr, "https" : proxy_addr})
         opener = urllib2.build_opener(proxy_support)
         urllib2.install_opener(opener)
-        
+
     # ok so the thumbnail was not in the cache. Get it.
     try:
         response = urllib2.urlopen(url)
@@ -243,8 +118,8 @@ def download_url(sg, url, location):
             f.close()
     except Exception, e:
         raise TankError("Could not download contents of url '%s'. Error reported: %s" % (url, e))
-    
-def create_sg_connection(user="default"):
+
+def create_sg_connection(pc=None, user="default"):
     """
     Creates a standard tank shotgun connection.
     User refers to the shotgun user specified in the config shotgun.yml file.
@@ -252,10 +127,12 @@ def create_sg_connection(user="default"):
     :param user: Optional shotgun config user to use when
                  connecting to shotgun.
     """
-    api_handle, _ = __create_sg_connection(__get_sg_config(), evaluate_script_user=False, user=user)
+    from ..pipelineconfig import get_shotgun_config_data
+    config_data = get_shotgun_config_data(pc, user)
+    api_handle, _ = __create_sg_connection(config_data, evaluate_script_user=False)
     return api_handle
 
-def create_sg_app_store_connection():
+def create_sg_app_store_connection(pc=None):
     """
     Creates a shotgun connection to the tank app store.
 
@@ -266,10 +143,12 @@ def create_sg_app_store_connection():
     as a standard sg entity dictionary.
     """
     global g_app_store_connection
-    
+
     if g_app_store_connection is None:
-        g_app_store_connection = __create_sg_connection(__get_app_store_config(), evaluate_script_user=True)
-    
+        from ..pipelineconfig import get_app_store_config_data
+        config_data = get_app_store_config_data(pc)
+        g_app_store_connection = __create_sg_connection(config_data, evaluate_script_user=True)
+
     return g_app_store_connection
 
 
@@ -608,8 +487,8 @@ def register_publish(tk, context, path, name, version_number, **kwargs):
 
         created_at - override for the date the publish is created at.  This should be a python
                     datetime object
-                    
-        version_entity - the Shotgun version entity this published file should be linked to 
+
+        version_entity - the Shotgun version entity this published file should be linked to
 
     """
     # get the task from the optional args, fall back on context task if not set
@@ -658,16 +537,16 @@ def register_publish(tk, context, path, name, version_number, **kwargs):
                 sg_published_file_type = tk.shotgun.create("TankType", {"code": published_file_type, "project": context.project})
 
     # create the publish
-    entity = _create_published_file(tk, 
-                                    context, 
-                                    path, 
-                                    name, 
-                                    version_number, 
-                                    task, 
-                                    comment, 
-                                    sg_published_file_type, 
-                                    created_by_user, 
-                                    created_at, 
+    entity = _create_published_file(tk,
+                                    context,
+                                    path,
+                                    name,
+                                    version_number,
+                                    task,
+                                    comment,
+                                    sg_published_file_type,
+                                    created_by_user,
+                                    created_at,
                                     version_entity)
 
     # upload thumbnails
@@ -690,7 +569,7 @@ def register_publish(tk, context, path, name, version_number, **kwargs):
         # no thumbnail found - instead use the default one
         # local import to avoid cyclic references
         from ..pipelineconfig import get_current_code_install_root
-        no_thumb = os.path.join(get_current_code_install_root(), "install", "core", 
+        no_thumb = os.path.join(get_current_core_root(),
                                 "resources", "no_preview.jpg")
         tk.shotgun.upload_thumbnail(published_file_entity_type, entity.get("id"), no_thumb)
 
@@ -722,13 +601,13 @@ def _create_dependencies(tk, publish_entity, dependency_paths, dependency_ids):
     """
     Creates dependencies in shotgun from a given entity to
     a list of paths and ids. Paths not recognized are skipped.
-    
+
     :param tk: API handle
     :param publish_entity: The publish entity to set the dependencies for. This is a dictionary
                            with keys type and id.
     :param dependency_paths: List of paths on disk. List of strings.
     :param dependency_ids: List of publish entity ids to associate. List of ints
-    
+
     """
     published_file_entity_type = get_published_file_entity_type(tk)
 
@@ -738,63 +617,63 @@ def _create_dependencies(tk, publish_entity, dependency_paths, dependency_ids):
     sg_batch_data = []
 
     for dependency_path in dependency_paths:
-        
+
         # did we manage to resolve this file path against
         # a publish in shotgun?
         published_file = publishes.get(dependency_path)
-        
+
         if published_file:
             if published_file_entity_type == "PublishedFile":
 
-                req = {"request_type": "create", 
-                       "entity_type": "PublishedFileDependency", 
+                req = {"request_type": "create",
+                       "entity_type": "PublishedFileDependency",
                        "data": {"published_file": publish_entity,
                                 "dependent_published_file": published_file
                                 }
-                        } 
-                sg_batch_data.append(req)    
-            
+                        }
+                sg_batch_data.append(req)
+
             else:# == "TankPublishedFile"
 
-                req = {"request_type": "create", 
-                       "entity_type": "TankDependency", 
+                req = {"request_type": "create",
+                       "entity_type": "TankDependency",
                        "data": {"tank_published_file": publish_entity,
                                 "dependent_tank_published_file": published_file
                                 }
-                        } 
+                        }
                 sg_batch_data.append(req)
 
 
     for dependency_id in dependency_ids:
         if published_file_entity_type == "PublishedFile":
 
-            req = {"request_type": "create", 
-                   "entity_type": "PublishedFileDependency", 
+            req = {"request_type": "create",
+                   "entity_type": "PublishedFileDependency",
                    "data": {"published_file": publish_entity,
-                            "dependent_published_file": {"type": "PublishedFile", 
+                            "dependent_published_file": {"type": "PublishedFile",
                                                          "id": dependency_id }
                             }
-                    } 
+                    }
             sg_batch_data.append(req)
-            
+
         else:# == "TankPublishedFile"
-            
-            req = {"request_type": "create", 
-                   "entity_type": "TankDependency", 
+
+            req = {"request_type": "create",
+                   "entity_type": "TankDependency",
                    "data": {"tank_published_file": publish_entity,
-                            "dependent_tank_published_file": {"type": "TankPublishedFile", 
+                            "dependent_tank_published_file": {"type": "TankPublishedFile",
                                                               "id": dependency_id }
                             }
-                    } 
+                    }
             sg_batch_data.append(req)
 
 
     # push to shotgun in a single xact
     if len(sg_batch_data) > 0:
         tk.shotgun.batch(sg_batch_data)
-                
 
-def _create_published_file(tk, context, path, name, version_number, task, comment, published_file_type, 
+
+def _create_published_file(tk, context, path, name, version_number, task, comment, published_file_type,
                            created_by_user, created_at, version_entity):
     """
     Creates a publish entity in shotgun given some standard fields.
@@ -816,7 +695,7 @@ def _create_published_file(tk, context, path, name, version_number, task, commen
             path_is_url = True
     elif res.netloc:
         path_is_url = True
-        
+
     code = ""
     if path_is_url:
         code = os.path.basename(res.path)
@@ -844,9 +723,9 @@ def _create_published_file(tk, context, path, name, version_number, task, commen
     else:
         # Make path platform agnostic.
         _, path_cache = _calc_path_cache(tk, path)
-        
+
         data["path"] = { "local_path": path }
-        data["path_cache"] = path_cache        
+        data["path_cache"] = path_cache
 
     if created_by_user:
         data["created_by"] = created_by_user
@@ -907,21 +786,21 @@ def _calc_path_cache(tk, path):
 #################################################################################################
 # wrappers around the shotgun API's http header API methods
 
-    
+
 class ToolkitUserAgentHandler(object):
     """
     Convenience wrapper to handle the user agent management
     """
-    
+
     def __init__(self, sg):
         self._sg = sg
-        
+
         self._app = None
         self._framework = None
         self._engine = None
-        
+
         self._core_version = None
-        
+
     def __clear_bundles(self):
         """
         Resets the currently active bundle.
@@ -930,48 +809,48 @@ class ToolkitUserAgentHandler(object):
         self._framework = None
         self._engine = None
 
-        
+
     def set_current_app(self, name, version, engine_name, engine_version):
         """
-        Update the user agent headers for the currently active app 
+        Update the user agent headers for the currently active app
         """
         # first clear out the other bundle settings - there can only
         # be one active bundle at a time
         self.__clear_bundles()
 
-        # populate the currently running bundle data        
+        # populate the currently running bundle data
         self._app = (name, version)
         self._engine = (engine_name, engine_version)
-        
+
         # push to shotgun
         self.__update()
-        
+
     def set_current_framework(self, name, version, engine_name, engine_version):
         """
-        Update the user agent headers for the currently active framework 
+        Update the user agent headers for the currently active framework
         """
         # first clear out the other bundle settings - there can only
         # be one active bundle at a time
         self.__clear_bundles()
 
-        # populate the currently running bundle data        
+        # populate the currently running bundle data
         self._framework = (name, version)
         self._engine = (engine_name, engine_version)
-        
+
         # push to shotgun
         self.__update()
 
     def set_current_engine(self, name, version):
         """
-        Update the user agent headers for the currently active engine 
+        Update the user agent headers for the currently active engine
         """
         # first clear out the other bundle settings - there can only
         # be one active bundle at a time
         self.__clear_bundles()
 
-        # populate the currently running bundle data        
+        # populate the currently running bundle data
         self._engine = (name, version)
-        
+
         # push to shotgun
         self.__update()
 
@@ -981,17 +860,17 @@ class ToolkitUserAgentHandler(object):
         """
         self._core_version = core_version
         self.__update()
-        
+
     def __update(self):
         """
         Perform changes to the Shotgun API
         """
-        # note that because of shortcomings in the API, 
+        # note that because of shortcomings in the API,
         # we have to reference the member variable directly.
         #
         # sg._user_agents is a list of strings. By default,
-        # its value is [ "shotgun-json (1.2.3)" ] 
-        
+        # its value is [ "shotgun-json (1.2.3)" ]
+
         # First, remove any old toolkit settings
         new_agents = []
         for x in self._sg._user_agents:
@@ -1001,14 +880,14 @@ class ToolkitUserAgentHandler(object):
                x.startswith("tk-fw"):
                 continue
             new_agents.append(x)
-         
+
         # Add new toolkit settings
         if self._core_version:
             new_agents.append("tk-core (%s)" % self._core_version)
 
         if self._engine:
             new_agents.append("tk-engine (%s %s)" % self._engine)
-        
+
         if self._app:
             new_agents.append("tk-app (%s %s)" % self._app)
 
@@ -1017,6 +896,6 @@ class ToolkitUserAgentHandler(object):
 
         # and update shotgun
         self._sg._user_agents = new_agents
-        
-        
-        
+
+
+

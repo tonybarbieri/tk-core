@@ -1,0 +1,10 @@
+# Tank configuration file
+# this file was automatically created
+
+default:
+    host: null
+    api_script: Tank
+    api_key: null
+    http_proxy: null
+
+# End of file.

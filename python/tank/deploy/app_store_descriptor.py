@@ -1,11 +1,11 @@
 # Copyright (c) 2013 Shotgun Software Inc.
-# 
+#
 # CONFIDENTIAL AND PROPRIETARY
-# 
-# This work is provided "AS IS" and subject to the Shotgun Pipeline Toolkit 
+#
+# This work is provided "AS IS" and subject to the Shotgun Pipeline Toolkit
 # Source Code License included in this distribution package. See LICENSE.
-# By accessing, using, copying or modifying this work you indicate your 
-# agreement to the Shotgun Pipeline Toolkit Source Code License. All rights 
+# By accessing, using, copying or modifying this work you indicate your
+# agreement to the Shotgun Pipeline Toolkit Source Code License. All rights
 # not expressly granted therein are reserved by Shotgun Software Inc.
 
 """
@@ -19,8 +19,8 @@ import uuid
 import tempfile
 
 # use api json to cover py 2.5
-# todo - replace with proper external library  
-from tank_vendor import shotgun_api3  
+# todo - replace with proper external library
+from tank_vendor import shotgun_api3
 json = shotgun_api3.shotgun.json
 
 from ..api import Tank
@@ -64,7 +64,7 @@ class TankAppStoreDescriptor(AppDescriptor):
             except:
                 # fail gracefully - this is only a cache
                 pass
-    
+
     def _get_app_store_metadata(self):
         """
         Returns a metadata dictionary for this particular location.
@@ -101,7 +101,7 @@ class TankAppStoreDescriptor(AppDescriptor):
         Fetches metadata about the app from the tank app store
         returns a dictionary with a bundle key and a version key.
         """
-        
+
         # find the right shotgun entity types
         if self._type == AppDescriptor.APP:
             bundle_entity = constants.TANK_APP_ENTITY
@@ -122,7 +122,7 @@ class TankAppStoreDescriptor(AppDescriptor):
             raise TankError("Illegal type value!")
 
         # connect to the app store
-        (sg, script_user) = shotgun.create_sg_app_store_connection()
+        (sg, script_user) = shotgun.create_sg_app_store_connection(pc=self._pipeline_config)
 
         # first find the bundle level entity
         bundle = sg.find_one(bundle_entity, [["sg_system_name", "is", self._name]], ["sg_status_list", "sg_deprecation_message"])
@@ -132,8 +132,8 @@ class TankAppStoreDescriptor(AppDescriptor):
         # now get the version
         version = sg.find_one(version_entity,
                               [[link_field, "is", bundle], ["code", "is", self._version]],
-                              ["description", 
-                               "sg_detailed_release_notes", 
+                              ["description",
+                               "sg_detailed_release_notes",
                                "sg_documentation",
                                constants.TANK_CODE_PAYLOAD_FIELD])
         if version is None:
@@ -154,7 +154,7 @@ class TankAppStoreDescriptor(AppDescriptor):
             if not os.path.exists(folder):
                 old_umask = os.umask(0)
                 os.makedirs(folder, 0777)
-                os.umask(old_umask)                
+                os.umask(old_umask)
             fp = open(os.path.join(folder, METADATA_FILE), "wt")
             json.dump(metadata, fp)
             fp.close()
@@ -176,10 +176,10 @@ class TankAppStoreDescriptor(AppDescriptor):
         app store for example) and want to get a formal "handle" to it.
 
         the version_pattern parameter can be on the following forms:
-        
+
         - v0.1.2, v0.12.3.2, v0.1.3beta - a specific version
         - v0.12.x - get the highest v0.12 version
-        - v1.x.x - get the highest v1 version 
+        - v1.x.x - get the highest v1 version
 
         :returns: TankAppStoreDescriptor instance
         """
@@ -201,8 +201,8 @@ class TankAppStoreDescriptor(AppDescriptor):
                            AppDescriptor.ENGINE: "sg_tank_engine" }
 
         # find the main entry
-        bundle = sg.find_one(main_entity_map[bundle_type], 
-                             [["sg_system_name", "is", name]], 
+        bundle = sg.find_one(main_entity_map[bundle_type],
+                             [["sg_system_name", "is", name]],
                              ["id", "sg_status_list"])
         if bundle is None:
             raise TankError("App store does not contain an item named '%s'!" % name)
@@ -214,14 +214,14 @@ class TankAppStoreDescriptor(AppDescriptor):
             is_deprecated = True
 
         # now get all versions
-        
+
         # get latest get the filter logic for what to exclude
         if constants.APP_STORE_QA_MODE_ENV_VAR in os.environ:
             latest_filter = [["sg_status_list", "is_not", "bad" ]]
         else:
             latest_filter = [["sg_status_list", "is_not", "rev" ],
-                             ["sg_status_list", "is_not", "bad" ]]        
-        
+                             ["sg_status_list", "is_not", "bad" ]]
+
         link_field = link_field_map[bundle_type]
         entity_type = version_entity_map[bundle_type]
         sg_data = sg.find(entity_type, [[link_field, "is", bundle]] + latest_filter, ["code"])
@@ -235,14 +235,14 @@ class TankAppStoreDescriptor(AppDescriptor):
         #
         # For example, the following versions:
         # v1.2.1, v1.2.2, v1.2.3, v1.4.3, v1.4.2, v1.4.1
-        # 
+        #
         # Would generate the following:
         # { "1": { "2": [1,2,3], "4": [3,2,1] } }
-        #  
-        
+        #
+
         version_numbers = [x.get("code") for x in sg_data]
         versions = {}
-        
+
         for version_num in version_numbers:
 
             try:
@@ -251,7 +251,7 @@ class TankAppStoreDescriptor(AppDescriptor):
             except:
                 # this version number was not on the form vX.Y.Z where X Y and Z are ints. skip.
                 continue
-            
+
             if major not in versions:
                 versions[major] = {}
             if minor not in versions[major]:
@@ -269,22 +269,22 @@ class TankAppStoreDescriptor(AppDescriptor):
                                 "of '%s' in the App store!" % (version_pattern, name))
             else:
                 # the requested version exists in the app store!
-                version_to_use = version_pattern 
-        
+                version_to_use = version_pattern
+
         elif re.match("v[0-9]+\.x\.x", version_pattern):
             # we have a v123.x.x pattern
             (major_str, _, _) = version_pattern[1:].split(".")
             major = int(major_str)
-            
+
             if major not in versions:
                 raise TankError("%s does not have a version matching the pattern '%s'. "
                                 "Available versions are: %s" % (name, version_pattern, ", ".join(version_numbers)))
             # now find the max version
-            max_minor = max(versions[major].keys())            
+            max_minor = max(versions[major].keys())
             max_increment = max(versions[major][max_minor])
             version_to_use = "v%s.%s.%s" % (major, max_minor, max_increment)
-            
-            
+
+
         elif re.match("v[0-9]+\.[0-9]+\.x", version_pattern):
             # we have a v123.345.x pattern
             (major_str, minor_str, _) = version_pattern[1:].split(".")
@@ -295,11 +295,11 @@ class TankAppStoreDescriptor(AppDescriptor):
             if (major not in versions) or (minor not in versions[major]):
                 raise TankError("%s does not have a version matching the pattern '%s'. "
                                 "Available versions are: %s" % (name, version_pattern, ", ".join(version_numbers)))
-            
+
             # now find the max increment
             max_increment = max(versions[major][minor])
             version_to_use = "v%s.%s.%s" % (major, minor, max_increment)
-        
+
         else:
             raise TankError("Cannot parse version expression '%s'!" % version_pattern)
 
@@ -308,18 +308,18 @@ class TankAppStoreDescriptor(AppDescriptor):
 
         # and return a descriptor instance
         desc = TankAppStoreDescriptor(pipeline_config, location_dict, bundle_type)
-        
+
         # now if this item has been deprecated, meaning that someone has gone in to the app
         # store and updated the record's deprecation status, we want to make sure we download
         # all this info the next time it is being requested. So we force clear the metadata
         # cache.
         if is_deprecated:
             desc._remove_app_store_metadata()
-        
+
         return desc
 
-    
-    
+
+
     @classmethod
     def _find_latest(cls, pipeline_config, bundle_type, name):
         """
@@ -343,7 +343,7 @@ class TankAppStoreDescriptor(AppDescriptor):
         else:
             latest_filter = [["sg_status_list", "is_not", "rev" ],
                              ["sg_status_list", "is_not", "bad" ]]
-        
+
         # set up some lookup tables so we look in the right table in sg
         main_entity_map = { AppDescriptor.APP: constants.TANK_APP_ENTITY,
                             AppDescriptor.FRAMEWORK: constants.TANK_FRAMEWORK_ENTITY,
@@ -358,8 +358,8 @@ class TankAppStoreDescriptor(AppDescriptor):
                            AppDescriptor.ENGINE: "sg_tank_engine" }
 
         # find the main entry
-        bundle = sg.find_one(main_entity_map[bundle_type], 
-                             [["sg_system_name", "is", name]], 
+        bundle = sg.find_one(main_entity_map[bundle_type],
+                             [["sg_system_name", "is", name]],
                              ["id", "sg_status_list"])
         if bundle is None:
             raise TankError("App store does not contain an item named '%s'!" % name)
@@ -391,14 +391,14 @@ class TankAppStoreDescriptor(AppDescriptor):
 
         # and return a descriptor instance
         desc = TankAppStoreDescriptor(pipeline_config, location_dict, bundle_type)
-        
+
         # now if this item has been deprecated, meaning that someone has gone in to the app
         # store and updated the record's deprecation status, we want to make sure we download
         # all this info the next time it is being requested. So we force clear the metadata
         # cache.
         if is_deprecated:
             desc._remove_app_store_metadata()
-        
+
         return desc
 
     @classmethod
@@ -408,12 +408,12 @@ class TankAppStoreDescriptor(AppDescriptor):
         of the sought after object. If no matching item is found, an
         exception is raised. A constraint pattern can be specified if you want to search
         a subset of the version space available.
-        
+
         This pattern can be on the following forms:
-        
+
         - v0.1.2, v0.12.3.2, v0.1.3beta - a specific version
         - v0.12.x - get the highest v0.12 version
-        - v1.x.x - get the highest v1 version 
+        - v1.x.x - get the highest v1 version
 
         This method is useful if you know the name of an app (after browsing in the
         app store for example) and want to get a formal "handle" to it.
@@ -446,7 +446,7 @@ class TankAppStoreDescriptor(AppDescriptor):
             msg = metadata.get("bundle").get("sg_deprecation_message", "No reason given.")
             return (True, msg)
         else:
-            return (False, "")        
+            return (False, "")
 
     def get_version(self):
         """
@@ -510,11 +510,11 @@ class TankAppStoreDescriptor(AppDescriptor):
         if not os.path.exists(target):
             old_umask = os.umask(0)
             os.makedirs(target, 0777)
-            os.umask(old_umask)                
+            os.umask(old_umask)
 
         # connect to the app store
-        (sg, script_user) = shotgun.create_sg_app_store_connection()
-        local_sg = shotgun.create_sg_connection()
+        (sg, script_user) = shotgun.create_sg_app_store_connection(pc=self._pipeline_config)
+        local_sg = shotgun.create_sg_connection(pc=self._pipeline_config)
 
         # get metadata from sg...
         metadata = self.__download_app_store_metadata()
@@ -589,18 +589,18 @@ class TankAppStoreDescriptor(AppDescriptor):
     def find_latest_version(self, constraint_pattern=None):
         """
         Returns a descriptor object that represents the latest version.
-        
+
         :param constraint_pattern: If this is specified, the query will be constrained
         by the given pattern. Version patterns are on the following forms:
-        
+
             - v1.2.3 (means the descriptor returned will inevitably be same as self)
-            - v1.2.x 
+            - v1.2.x
             - v1.x.x
 
         :returns: descriptor object
         """
         return self.find_latest_item(self._pipeline_config, self._type, self._name, constraint_pattern)
-        
-        
+
+
 
 

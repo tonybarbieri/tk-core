@@ -1,0 +1,19 @@
+apps:
+    Darwin: "../../install/apps"
+    Linux: "../../install/apps"
+    Windows: "../../install/apps"
+
+engines:
+    Darwin: "../../install/engines"
+    Linux: "../../install/engines"
+    Windows: "../../install/engines"
+
+frameworks:
+    Darwin: "../../install/frameworks"
+    Linux: "../../install/frameworks"
+    Windows: "../../install/frameworks"
+
+core:
+    Darwin: "/mnt/studio"
+    Linux: "/mnt/studio"
+    Windows: "Z:\studio"
